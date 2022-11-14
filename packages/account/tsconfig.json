@@ -17,7 +17,8 @@
             "Stores/*": ["src/Stores/*"],
             "Styles/*": ["src/Styles/*"],
             "Types": ["src/Types"],
+            "@deriv/*": ["../*/src"]
         }
     },
-    "include": ["./src/**/*.ts", "./src/**/*.tsx", "globals.d.ts"] // *** The files TypeScript should type check ***
+    "include": ["src","globals.d.ts"]
 }

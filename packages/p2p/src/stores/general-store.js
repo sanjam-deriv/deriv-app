@@ -8,15 +8,23 @@ import { createExtendedOrderDetails } from 'Utils/orders';
 import { init as WebsocketInit, requestWS, subscribeWS } from 'Utils/websocket';
 import { order_list } from 'Constants/order-list';
 import { buy_sell } from 'Constants/buy-sell';
+import { api_error_codes } from '../constants/api-error-codes';
 
 export default class GeneralStore extends BaseStore {
     active_index = 0;
     active_notification_count = 0;
     advertiser_id = null;
+    advertiser_buy_limit = null;
+    advertiser_sell_limit = null;
+    block_unblock_user_error = '';
     balance;
+    feature_level = null;
     inactive_notification_count = 0;
     is_advertiser = false;
+    is_advertiser_blocked = null;
     is_blocked = false;
+    is_block_unblock_user_loading = false;
+    is_block_user_modal_open = false;
     is_listed = false;
     is_loading = false;
     is_p2p_blocked_for_pa = false;
@@ -32,6 +40,7 @@ export default class GeneralStore extends BaseStore {
     review_period;
     should_show_real_name = false;
     should_show_popup = false;
+    user_blocked_count = 0;
     user_blocked_until = null;
     is_high_risk_fully_authed_without_fa = false;
     is_modal_open = false;
@@ -54,10 +63,17 @@ export default class GeneralStore extends BaseStore {
             active_index: observable,
             active_notification_count: observable,
             advertiser_id: observable,
+            advertiser_buy_limit: observable,
+            advertiser_sell_limit: observable,
+            block_unblock_user_error: observable,
             balance: observable,
+            feature_level: observable,
             inactive_notification_count: observable,
             is_advertiser: observable,
+            is_advertiser_blocked: observable,
             is_blocked: observable,
+            is_block_unblock_user_loading: observable,
+            is_block_user_modal_open: observable,
             is_listed: observable,
             is_loading: observable,
             is_p2p_blocked_for_pa: observable,
@@ -73,6 +89,7 @@ export default class GeneralStore extends BaseStore {
             review_period: observable,
             should_show_real_name: observable,
             should_show_popup: observable,
+            user_blocked_count: observable,
             user_blocked_until: observable,
             is_high_risk_fully_authed_without_fa: observable,
             is_modal_open: observable,
@@ -84,11 +101,15 @@ export default class GeneralStore extends BaseStore {
             is_barred: computed,
             is_my_profile_tab_visible: computed,
             should_show_dp2p_blocked: computed,
+            blockUnblockUser: action.bound,
             createAdvertiser: action.bound,
             getWebsiteStatus: action.bound,
             handleNotifications: action.bound,
+            redirectToOrderDetails: action.bound,
+            showCompletedOrderNotification: action.bound,
             handleTabClick: action.bound,
             onMount: action.bound,
+            subscribeToLocalCurrency: action.bound,
             onUnmount: action.bound,
             onNicknamePopupClose: action.bound,
             redirectTo: action.bound,
@@ -96,7 +117,10 @@ export default class GeneralStore extends BaseStore {
             setActiveNotificationCount: action.bound,
             setAccountBalance: action.bound,
             setAdvertiserId: action.bound,
+            setAdvertiserBuyLimit: action.bound,
+            setAdvertiserSellLimit: action.bound,
             setAppProps: action.bound,
+            setFeatureLevel: action.bound,
             setInactiveNotificationCount: action.bound,
             setIsAdvertiser: action.bound,
             setIsBlocked: action.bound,
@@ -115,8 +139,13 @@ export default class GeneralStore extends BaseStore {
             setParameters: action.bound,
             setPoiStatus: action.bound,
             setReviewPeriod: action.bound,
+            setBlockUnblockUserError: action.bound,
+            setIsAdvertiserBlocked: action.bound,
+            setIsBlockUnblockUserLoading: action.bound,
+            setIsBlockUserModalOpen: action.bound,
             setShouldShowRealName: action.bound,
             setShouldShowPopup: action.bound,
+            setUserBlockedCount: action.bound,
             setUserBlockedUntil: action.bound,
             setWebsocketInit: action.bound,
             toggleNicknamePopup: action.bound,
@@ -157,20 +186,55 @@ export default class GeneralStore extends BaseStore {
         return this.is_blocked || this.is_high_risk_fully_authed_without_fa;
     }
 
+    blockUnblockUser(should_block, advertiser_id, should_set_is_counterparty_blocked = true) {
+        const { advertiser_page_store } = this.root_store;
+        this.setIsBlockUnblockUserLoading(true);
+        requestWS({
+            p2p_advertiser_relations: 1,
+            [should_block ? 'add_blocked' : 'remove_blocked']: [advertiser_id],
+        }).then(response => {
+            if (response) {
+                if (!response.error) {
+                    this.setIsBlockUserModalOpen(false);
+                    if (should_set_is_counterparty_blocked) {
+                        const { p2p_advertiser_relations } = response;
+                        advertiser_page_store.setIsCounterpartyAdvertiserBlocked(
+                            p2p_advertiser_relations.blocked_advertisers.some(ad => ad.id === advertiser_id)
+                        );
+                    }
+                } else {
+                    this.setBlockUnblockUserError(response.error.message);
+                }
+            }
+            this.setIsBlockUnblockUserLoading(false);
+        });
+    }
+
     createAdvertiser(name) {
         requestWS({
             p2p_advertiser_create: 1,
             name,
         }).then(response => {
             const { sendbird_store, buy_sell_store } = this.root_store;
-            const { p2p_advertiser_create } = response;
+            const { error, p2p_advertiser_create } = response;
+            const {
+                daily_buy,
+                daily_buy_limit,
+                daily_sell,
+                daily_sell_limit,
+                id,
+                is_approved,
+                name: advertiser_name,
+            } = p2p_advertiser_create || {};
 
-            if (response.error) {
-                this.setNicknameError(response.error.message);
+            if (error) {
+                this.setNicknameError(error.message);
             } else {
-                this.setAdvertiserId(p2p_advertiser_create.id);
-                this.setIsAdvertiser(!!p2p_advertiser_create.is_approved);
-                this.setNickname(p2p_advertiser_create.name);
+                this.setAdvertiserId(id);
+                this.setAdvertiserBuyLimit(daily_buy_limit - daily_buy);
+                this.setAdvertiserSellLimit(daily_sell_limit - daily_sell);
+                this.setIsAdvertiser(!!is_approved);
+                this.setNickname(advertiser_name);
                 this.setNicknameError(undefined);
                 sendbird_store.handleP2pAdvertiserInfo(response);
                 this.toggleNicknamePopup();
@@ -196,9 +260,13 @@ export default class GeneralStore extends BaseStore {
     getWebsiteStatus() {
         requestWS({ website_status: 1 }).then(response => {
             if (response && !response.error) {
+                const { buy_sell_store } = this.root_store;
                 const { p2p_config } = response.website_status;
+                const { feature_level, local_currencies, review_period } = p2p_config || {};
 
-                this.setReviewPeriod(p2p_config.review_period);
+                this.setFeatureLevel(feature_level);
+                buy_sell_store.setLocalCurrencies(local_currencies);
+                this.setReviewPeriod(review_period);
             }
         });
     }
@@ -269,15 +337,27 @@ export default class GeneralStore extends BaseStore {
         this.updateP2pNotifications(notifications);
     }
 
+    redirectToOrderDetails(order_id) {
+        const { order_store } = this.root_store;
+        this.redirectTo('orders');
+        this.setOrderTableType(order_list.INACTIVE);
+        order_store.setOrderId(order_id);
+    }
+
     showCompletedOrderNotification(advertiser_name, order_id) {
+        const { order_store } = this.root_store;
         const notification_key = `order-${order_id}`;
+
+        // we need to refresh notifications in notifications-store in the case of a bug when user closes the notification, the notification count is not synced up with the closed notification
+        this.props.refreshNotifications();
 
         this.props.addNotificationMessage({
             action: {
                 onClick: () => {
-                    this.redirectTo('orders');
-                    this.setOrderTableType(order_list.INACTIVE);
-                    this.root_store.order_store.setOrderId(order_id);
+                    if (order_store.order_id === order_id) {
+                        order_store.setIsRatingModalOpen(true);
+                    }
+                    this.redirectToOrderDetails(order_id);
                 },
                 text: localize('Give feedback'),
             },
@@ -387,16 +467,42 @@ export default class GeneralStore extends BaseStore {
                         exchange_rates: 1,
                         base_currency: this.client.currency,
                         subscribe: 1,
-                        target_currency: this.client.local_currency_config?.currency,
+                        target_currency:
+                            this.root_store.buy_sell_store.selected_local_currency ??
+                            this.client.local_currency_config?.currency,
                     },
                     [this.root_store.floating_rate_store.fetchExchangeRate]
                 ),
             };
 
+            this.disposeLocalCurrencyReaction = reaction(
+                () => [this.root_store.buy_sell_store.local_currency, this.active_index],
+                () => {
+                    this.subscribeToLocalCurrency();
+                }
+            );
+
             if (this.ws_subscriptions) {
                 this.setIsLoading(false);
             }
         });
+    }
+
+    subscribeToLocalCurrency() {
+        const { floating_rate_store, buy_sell_store } = this.root_store;
+        const client_currency = this.client.local_currency_config?.currency;
+
+        this.ws_subscriptions?.exchange_rate_subscription?.unsubscribe?.();
+        this.ws_subscriptions.exchange_rate_subscription = subscribeWS(
+            {
+                exchange_rates: 1,
+                base_currency: this.client.currency,
+                subscribe: 1,
+                target_currency:
+                    this.active_index > 0 ? client_currency : buy_sell_store.local_currency ?? client_currency,
+            },
+            [floating_rate_store.fetchExchangeRate]
+        );
     }
 
     onUnmount() {
@@ -407,6 +513,10 @@ export default class GeneralStore extends BaseStore {
 
         if (typeof this.disposeUserBarredReaction === 'function') {
             this.disposeUserBarredReaction();
+        }
+
+        if (typeof this.disposeLocalCurrencyReaction === 'function') {
+            this.disposeLocalCurrencyReaction();
         }
 
         this.setActiveIndex(0);
@@ -454,8 +564,24 @@ export default class GeneralStore extends BaseStore {
         this.advertiser_id = advertiser_id;
     }
 
+    setAdvertiserBuyLimit(advertiser_buy_limit) {
+        this.advertiser_buy_limit = advertiser_buy_limit;
+    }
+
+    setAdvertiserSellLimit(advertiser_sell_limit) {
+        this.advertiser_sell_limit = advertiser_sell_limit;
+    }
+
     setAppProps(props) {
         this.props = props;
+    }
+
+    setBlockUnblockUserError(block_unblock_user_error) {
+        this.block_unblock_user_error = block_unblock_user_error;
+    }
+
+    setFeatureLevel(feature_level) {
+        this.feature_level = feature_level;
     }
 
     setInactiveNotificationCount(inactive_notification_count) {
@@ -466,8 +592,20 @@ export default class GeneralStore extends BaseStore {
         this.is_advertiser = is_advertiser;
     }
 
+    setIsAdvertiserBlocked(is_advertiser_blocked) {
+        this.is_advertiser_blocked = is_advertiser_blocked;
+    }
+
     setIsBlocked(is_blocked) {
         this.is_blocked = is_blocked;
+    }
+
+    setIsBlockUserModalOpen(is_block_user_modal_open) {
+        this.is_block_user_modal_open = is_block_user_modal_open;
+    }
+
+    setIsBlockUnblockUserLoading(is_block_unblock_user_loading) {
+        this.is_block_unblock_user_loading = is_block_unblock_user_loading;
     }
 
     setIsHighRiskFullyAuthedWithoutFa(is_high_risk_fully_authed_without_fa) {
@@ -518,13 +656,19 @@ export default class GeneralStore extends BaseStore {
             if (!!response && response.error) {
                 floating_rate_store.setApiErrorMessage(response.error.message);
             } else {
-                const { fixed_rate_adverts, float_rate_adverts, float_rate_offset_limit, fixed_rate_adverts_end_date } =
-                    response.website_status.p2p_config;
+                const {
+                    fixed_rate_adverts,
+                    float_rate_adverts,
+                    float_rate_offset_limit,
+                    fixed_rate_adverts_end_date,
+                    override_exchange_rate,
+                } = response.website_status.p2p_config;
                 floating_rate_store.setFixedRateAdvertStatus(fixed_rate_adverts);
                 floating_rate_store.setFloatingRateAdvertStatus(float_rate_adverts);
                 floating_rate_store.setFloatRateOffsetLimit(float_rate_offset_limit);
                 floating_rate_store.setFixedRateAdvertsEndDate(fixed_rate_adverts_end_date || null);
                 floating_rate_store.setApiErrorMessage(null);
+                if (override_exchange_rate) floating_rate_store.setOverrideExchangeRate(override_exchange_rate);
             }
         });
     }
@@ -580,6 +724,10 @@ export default class GeneralStore extends BaseStore {
         this.should_show_popup = should_show_popup;
     }
 
+    setUserBlockedCount(user_blocked_count) {
+        this.user_blocked_count = user_blocked_count;
+    }
+
     setUserBlockedUntil(user_blocked_until) {
         this.user_blocked_until = user_blocked_until;
     }
@@ -594,20 +742,37 @@ export default class GeneralStore extends BaseStore {
     }
 
     updateAdvertiserInfo(response) {
-        const { p2p_advertiser_info } = response;
+        const {
+            daily_buy,
+            daily_buy_limit,
+            daily_sell,
+            daily_sell_limit,
+            blocked_until,
+            blocked_by_count,
+            id,
+            is_approved,
+            is_blocked,
+            is_listed,
+            name,
+        } = response?.p2p_advertiser_info || {};
+
         if (!response.error) {
-            this.setAdvertiserId(p2p_advertiser_info.id);
-            this.setIsAdvertiser(!!p2p_advertiser_info.is_approved);
-            this.setIsListed(!!p2p_advertiser_info.is_listed);
-            this.setNickname(p2p_advertiser_info.name);
-            this.setUserBlockedUntil(p2p_advertiser_info.blocked_until);
+            this.setAdvertiserId(id);
+            this.setAdvertiserBuyLimit(daily_buy_limit - daily_buy);
+            this.setAdvertiserSellLimit(daily_sell_limit - daily_sell);
+            this.setIsAdvertiser(!!is_approved);
+            this.setIsAdvertiserBlocked(!!is_blocked);
+            this.setIsListed(!!is_listed);
+            this.setNickname(name);
+            this.setUserBlockedUntil(blocked_until);
+            this.setUserBlockedCount(blocked_by_count);
         } else {
             this.ws_subscriptions.advertiser_subscription.unsubscribe();
-            if (response.error.code === 'RestrictedCountry') {
+            if (response.error.code === api_error_codes.RESTRICTED_COUNTRY) {
                 this.setIsRestricted(true);
-            } else if (response.error.code === 'AdvertiserNotFound') {
+            } else if (response.error.code === api_error_codes.ADVERTISER_NOT_FOUND) {
                 this.setIsAdvertiser(false);
-            } else if (response.error.code === 'PermissionDenied') {
+            } else if (response.error.code === api_error_codes.PERMISSION_DENIED) {
                 this.setIsBlocked(true);
                 this.setIsLoading(false);
                 return;
@@ -660,10 +825,7 @@ export default class GeneralStore extends BaseStore {
                 v => v.length <= 24,
                 v => /^[a-zA-Z0-9\\.@_-]{2,24}$/.test(v),
                 v => /^(?!(.*(.)\\2{4,})|.*[\\.@_-]{2,}|^([\\.@_-])|.*([\\.@_-])$)[a-zA-Z0-9\\.@_-]{2,24}$/.test(v),
-                v =>
-                    Array.from(v).every(
-                        word => (v.match(new RegExp(word === '.' ? `\\${word}` : word, 'g')) || []).length <= 5
-                    ),
+                v => !/([a-zA-Z0-9\\.@_-])\1{4}/.test(v),
             ],
         };
 
@@ -673,7 +835,7 @@ export default class GeneralStore extends BaseStore {
             localize('Nickname is too long'),
             localize('Can only contain letters, numbers, and special characters .- _ @.'),
             localize('Cannot start, end with, or repeat special characters.'),
-            localize('Cannot repeat a character more than 5 times.'),
+            localize('Cannot repeat a character more than 4 times.'),
         ];
 
         const errors = {};

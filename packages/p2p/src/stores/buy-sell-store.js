@@ -1,5 +1,7 @@
+import React from 'react';
 import { action, computed, observable, reaction, makeObservable } from 'mobx';
 import { formatMoney, getDecimalPlaces, isMobile } from '@deriv/shared';
+import { Text } from '@deriv/components';
 import { localize } from 'Components/i18next';
 import { buy_sell } from 'Constants/buy-sell';
 import { requestWS } from 'Utils/websocket';
@@ -7,6 +9,7 @@ import { textValidator, lengthValidator } from 'Utils/validations';
 import { countDecimalPlaces } from 'Utils/string';
 import { removeTrailingZeros } from 'Utils/format-value';
 import BaseStore from 'Stores/base_store';
+import { api_error_codes } from '../constants/api-error-codes';
 
 export default class BuySellStore extends BaseStore {
     api_error_message = '';
@@ -21,14 +24,18 @@ export default class BuySellStore extends BaseStore {
     is_sort_dropdown_open = false;
     is_submit_disabled = true;
     items = [];
+    local_currencies = [];
+    local_currency = null;
     payment_info = '';
     receive_amount = 0;
     search_results = [];
     search_term = '';
     selected_ad_state = {};
+    selected_local_currency = null;
     selected_payment_method_value = [];
     selected_payment_method_text = [];
     selected_value = 'rate';
+    should_show_currency_selector_modal = false;
     should_show_popup = false;
     should_show_verification = false;
     should_use_client_limits = false;
@@ -48,14 +55,6 @@ export default class BuySellStore extends BaseStore {
     filter_payment_methods = [];
     payment_method_ids = [];
 
-    // eslint-disable-next-line class-methods-use-this
-    get sort_list() {
-        return [
-            { text: localize('Exchange rate (Default)'), value: 'rate' },
-            { text: localize('Completion rate'), value: 'completion' },
-        ];
-    }
-
     constructor(root_store) {
         // TODO: [mobx-undecorate] verify the constructor arguments and the arguments of this automatically generated super call
         super(root_store);
@@ -73,14 +72,18 @@ export default class BuySellStore extends BaseStore {
             is_sort_dropdown_open: observable,
             is_submit_disabled: observable,
             items: observable,
+            local_currencies: observable,
+            local_currency: observable,
             payment_info: observable,
             receive_amount: observable,
             search_results: observable,
             search_term: observable,
             selected_ad_state: observable,
+            selected_local_currency: observable,
             selected_payment_method_value: observable,
             selected_payment_method_text: observable,
             selected_value: observable,
+            should_show_currency_selector_modal: observable,
             should_show_popup: observable,
             should_show_verification: observable,
             should_use_client_limits: observable,
@@ -101,6 +104,8 @@ export default class BuySellStore extends BaseStore {
             rendered_items: computed,
             should_filter_by_payment_method: computed,
             getAdvertiserInfo: action.bound,
+            getSupportedPaymentMethods: action.bound,
+            getWebsiteStatus: action.bound,
             handleChange: action.bound,
             handleSubmit: action.bound,
             hideAdvertiserPage: action.bound,
@@ -111,6 +116,7 @@ export default class BuySellStore extends BaseStore {
             onClickApply: action.bound,
             onClickReset: action.bound,
             onConfirmClick: action.bound,
+            onLocalCurrencySelect: action.bound,
             setApiErrorMessage: action.bound,
             setContactInfo: action.bound,
             setErrorMessage: action.bound,
@@ -124,15 +130,19 @@ export default class BuySellStore extends BaseStore {
             setIsSortDropdownOpen: action.bound,
             setIsSubmitDisabled: action.bound,
             setItems: action.bound,
+            setLocalCurrency: action.bound,
+            setLocalCurrencies: action.bound,
             setPaymentInfo: action.bound,
             setInitialReceiveAmount: action.bound,
             setReceiveAmount: action.bound,
             setSearchResults: action.bound,
             setSearchTerm: action.bound,
             setSelectedAdState: action.bound,
+            setSelectedLocalCurrency: action.bound,
             setSelectedPaymentMethodValue: action.bound,
             setSelectedPaymentMethodText: action.bound,
             setSelectedValue: action.bound,
+            setShouldShowCurrencySelectorModal: action.bound,
             setShouldShowPopup: action.bound,
             setShouldShowVerification: action.bound,
             setShouldUseClientLimits: action.bound,
@@ -184,6 +194,10 @@ export default class BuySellStore extends BaseStore {
     }
 
     get rendered_items() {
+        const filtered_items = this.items.filter(item =>
+            this.table_type === buy_sell.BUY ? item.type === buy_sell.SELL : item.type === buy_sell.BUY
+        );
+
         if (isMobile()) {
             if (this.search_term) {
                 if (this.search_results.length) {
@@ -194,7 +208,7 @@ export default class BuySellStore extends BaseStore {
             // This allows for the sliding animation on the Buy/Sell toggle as it pushes
             // an empty item with an item that holds the same height of the toggle container.
             // Also see: buy-sell-row.jsx
-            return [{ id: 'WATCH_THIS_SPACE' }, ...this.items];
+            return [{ id: 'WATCH_THIS_SPACE' }, ...filtered_items];
         }
 
         if (this.search_term) {
@@ -203,12 +217,21 @@ export default class BuySellStore extends BaseStore {
             }
             return [{ id: 'NO_MATCH_ROW' }];
         }
-        return this.items;
+
+        return filtered_items;
     }
 
     get should_filter_by_payment_method() {
         const { my_profile_store } = this.root_store;
         return my_profile_store.payment_methods_list_values !== this.selected_payment_method_value;
+    }
+
+    // eslint-disable-next-line class-methods-use-this
+    get sort_list() {
+        return [
+            { text: localize('Exchange rate (Default)'), value: 'rate' },
+            { text: localize('User rating'), value: 'rating' },
+        ];
     }
 
     fetchAdvertiserAdverts() {
@@ -234,6 +257,31 @@ export default class BuySellStore extends BaseStore {
                     this.setContactInfo('');
                     this.setPaymentInfo('');
                 }
+            }
+        });
+    }
+
+    getSupportedPaymentMethods(payment_method_names) {
+        const { my_profile_store } = this.root_store;
+
+        //Get all payment methods supported in the country
+        const payment_methods = payment_method_names?.filter(
+            payment_method_name =>
+                Object.entries(my_profile_store.available_payment_methods).findIndex(
+                    payment_method => payment_method[1].display_name === payment_method_name
+                ) !== -1
+        );
+
+        return payment_methods;
+    }
+
+    getWebsiteStatus() {
+        requestWS({ website_status: 1 }).then(response => {
+            if (response) {
+                const { error, website_status } = response;
+
+                if (error) this.setErrorMessage(error.message);
+                else this.setLocalCurrencies(website_status.p2p_config?.local_currencies);
             }
         });
     }
@@ -314,6 +362,7 @@ export default class BuySellStore extends BaseStore {
                 ...(this.selected_payment_method_value.length > 0
                     ? { payment_method: this.selected_payment_method_value }
                     : {}),
+                ...(this.selected_local_currency ? { local_currency: this.selected_local_currency } : {}),
             }).then(response => {
                 if (response) {
                     if (!response.error) {
@@ -329,6 +378,10 @@ export default class BuySellStore extends BaseStore {
 
                             list.forEach(new_item => {
                                 const old_item_idx = old_items.findIndex(old_item => old_item.id === new_item.id);
+
+                                new_item.payment_method_names = this.getSupportedPaymentMethods(
+                                    new_item.payment_method_names
+                                );
 
                                 if (old_item_idx > -1) {
                                     old_items[old_item_idx] = new_item;
@@ -360,7 +413,7 @@ export default class BuySellStore extends BaseStore {
                             }
                         }
                         // Added a check to prevent console errors
-                    } else if (response && response.error.code === 'PermissionDenied') {
+                    } else if (response && response.error.code === api_error_codes.PERMISSION_DENIED) {
                         this.root_store.general_store.setIsBlocked(true);
                     } else {
                         this.setApiErrorMessage(response?.error.message);
@@ -398,6 +451,14 @@ export default class BuySellStore extends BaseStore {
 
         order_store.props.setOrderId(order_info.id);
         general_store.redirectTo('orders', { nav: { location: 'buy_sell' } });
+    }
+
+    onLocalCurrencySelect(local_currency) {
+        this.setSelectedLocalCurrency(local_currency);
+        this.setLocalCurrency(local_currency);
+        this.setItems([]);
+        this.setIsLoading(true);
+        this.loadMoreItems({ startIndex: 0 });
     }
 
     registerIsListedReaction() {
@@ -467,6 +528,40 @@ export default class BuySellStore extends BaseStore {
         this.items = items;
     }
 
+    setLocalCurrency(local_currency) {
+        this.local_currency = local_currency;
+    }
+
+    setLocalCurrencies(local_currencies) {
+        const currency_list = [];
+
+        local_currencies.forEach(currency => {
+            const { display_name, has_adverts, is_default, symbol } = currency;
+
+            if (is_default && !this.selected_local_currency) {
+                this.setSelectedLocalCurrency(symbol);
+                this.setLocalCurrency(symbol);
+            }
+
+            currency_list.push({
+                component: (
+                    <div className='currency-dropdown__list-item'>
+                        <div>{symbol}</div>
+                        <Text as='div' align='right' size='xs' line_height='xxs'>
+                            {display_name}
+                        </Text>
+                    </div>
+                ),
+                has_adverts,
+                is_default,
+                text: symbol,
+                value: symbol,
+            });
+        });
+
+        this.local_currencies = currency_list;
+    }
+
     setPaymentInfo(payment_info) {
         this.payment_info = payment_info;
     }
@@ -491,6 +586,10 @@ export default class BuySellStore extends BaseStore {
         this.selected_ad_state = selected_ad_state;
     }
 
+    setSelectedLocalCurrency(selected_local_currency) {
+        this.selected_local_currency = selected_local_currency;
+    }
+
     setSelectedPaymentMethodValue(payment_method_value) {
         this.selected_payment_method_value = [...payment_method_value];
     }
@@ -501,6 +600,10 @@ export default class BuySellStore extends BaseStore {
 
     setSelectedValue(selected_value) {
         this.selected_value = selected_value;
+    }
+
+    setShouldShowCurrencySelectorModal(should_show_currency_selector_modal) {
+        this.should_show_currency_selector_modal = should_show_currency_selector_modal;
     }
 
     setShouldShowPopup(should_show_popup) {
@@ -654,6 +757,10 @@ export default class BuySellStore extends BaseStore {
                                 // Added a check to prevent console errors
                                 if (response?.error) return;
                                 const { p2p_advert_info } = response;
+
+                                p2p_advert_info.payment_method_names = this.getSupportedPaymentMethods(
+                                    p2p_advert_info.payment_method_names
+                                );
 
                                 if (this.selected_ad_state?.id === p2p_advert_info.id) {
                                     this.setSelectedAdState(p2p_advert_info);

@@ -108,11 +108,13 @@ export default class ClientStore extends BaseStore {
         trading_platform_mt5_password_reset: '',
         trading_platform_dxtrade_password_reset: '',
         request_email: '',
+        social_email_change: '',
         system_email_change: '',
     };
 
     new_email = {
         system_email_change: '',
+        social_email_change: '',
     };
 
     account_limits = {};
@@ -248,13 +250,17 @@ export default class ClientStore extends BaseStore {
             landing_company: computed,
             is_valid_login: computed,
             is_logged_in: computed,
+            has_restricted_mt5_account: computed,
+            should_restrict_bvi_account_creation: computed,
             is_virtual: computed,
             is_eu: computed,
             is_uk: computed,
+            is_brazil: computed,
             country_standpoint: computed,
             can_have_mlt_account: computed,
             can_have_mx_account: computed,
             can_have_mf_account: computed,
+            can_have_whatsapp: computed,
             can_upgrade: computed,
             can_upgrade_to: computed,
             virtual_account_loginid: computed,
@@ -725,6 +731,16 @@ export default class ClientStore extends BaseStore {
         );
     }
 
+    get has_restricted_mt5_account() {
+        return !!this.mt5_login_list.filter(mt5_account => mt5_account?.status?.includes('poa_failed')).length;
+    }
+
+    get should_restrict_bvi_account_creation() {
+        return !!this.mt5_login_list.filter(
+            item => item?.landing_company_short === 'bvi' && item?.status === 'poa_failed'
+        ).length;
+    }
+
     get is_virtual() {
         return !isEmptyObject(this.accounts) && this.accounts[this.loginid] && !!this.accounts[this.loginid].is_virtual;
     }
@@ -740,6 +756,10 @@ export default class ClientStore extends BaseStore {
                   eu_shortcode_regex.test(gaming_shortcode) ||
                   eu_shortcode_regex.test(mt_gaming_shortcode)
             : eu_excluded_regex.test(this.residence);
+    }
+
+    get is_brazil() {
+        return this.clients_country === 'br';
     }
 
     get is_uk() {
@@ -834,6 +854,14 @@ export default class ClientStore extends BaseStore {
         return countries;
     }
 
+    get can_have_whatsapp() {
+        const country = this.residence || this.clients_country;
+        const allowed_countries = ['za', 'ng'];
+        const is_allowed_country = allowed_countries.includes(country);
+
+        return is_allowed_country;
+    }
+
     get can_upgrade() {
         return this.upgrade_info && (this.upgrade_info.can_upgrade || this.upgrade_info.can_open_multi);
     }
@@ -920,9 +948,11 @@ export default class ClientStore extends BaseStore {
         if (!this.website_status?.clients_country || !landing_companies || !Object.keys(landing_companies).length)
             return true;
 
+        // TODO: Remove two first conditions after real released
         return (
             'dxtrade_financial_company' in landing_companies ||
             'dxtrade_gaming_company' in landing_companies ||
+            'dxtrade_all_company' in landing_companies ||
             (!this.is_logged_in && !this.is_eu && !this.is_eu_country)
         );
     };
@@ -1379,6 +1409,10 @@ export default class ClientStore extends BaseStore {
         this.setIsLoggingIn(true);
         const authorize_response = await this.setUserLogin(login_new_user);
 
+        if (action_param === 'signup') {
+            this.root_store.ui.setIsNewAccount();
+        }
+
         if (search) {
             if (code_param && action_param) this.setVerificationCode(code_param, action_param);
             document.addEventListener('DOMContentLoaded', () => {
@@ -1819,6 +1853,8 @@ export default class ClientStore extends BaseStore {
         this.mt5_login_list = [];
         this.dxtrade_accounts_list = [];
         this.landing_companies = {};
+        localStorage.removeItem('readScamMessage');
+        localStorage.removeItem('isNewAccount');
         localStorage.setItem('active_loginid', this.loginid);
         localStorage.setItem('client.accounts', JSON.stringify(this.accounts));
 

@@ -4,6 +4,7 @@ import { localize } from 'Components/i18next';
 import { textValidator } from 'Utils/validations';
 import BaseStore from 'Stores/base_store';
 import { my_profile_tabs } from 'Constants/my-profile-tabs';
+import { api_error_codes } from '../constants/api-error-codes';
 
 export default class MyProfileStore extends BaseStore {
     active_tab = my_profile_tabs.MY_STATS;
@@ -13,6 +14,7 @@ export default class MyProfileStore extends BaseStore {
     advertiser_payment_methods_error = '';
     available_payment_methods = {};
     balance_available = null;
+    blocked_advertisers_list = [];
     contact_info = '';
     default_advert_description = '';
     delete_error_message = '';
@@ -33,6 +35,7 @@ export default class MyProfileStore extends BaseStore {
     payment_method_to_edit = {};
     search_results = [];
     search_term = '';
+    selected_blocked_user = {};
     selected_payment_method = '';
     selected_payment_method_display_name = '';
     selected_payment_method_fields = [];
@@ -54,6 +57,7 @@ export default class MyProfileStore extends BaseStore {
             advertiser_payment_methods_error: observable,
             available_payment_methods: observable,
             balance_available: observable,
+            blocked_advertisers_list: observable,
             contact_info: observable,
             default_advert_description: observable,
             delete_error_message: observable,
@@ -74,6 +78,7 @@ export default class MyProfileStore extends BaseStore {
             payment_method_to_edit: observable,
             search_results: observable,
             search_term: observable,
+            selected_blocked_user: observable,
             selected_payment_method: observable,
             selected_payment_method_display_name: observable,
             selected_payment_method_fields: observable,
@@ -90,8 +95,10 @@ export default class MyProfileStore extends BaseStore {
             payment_methods_list_items: computed,
             payment_methods_list_methods: computed,
             payment_methods_list_values: computed,
+            rendered_blocked_advertisers_list: computed,
             createPaymentMethod: action.bound,
             getAdvertiserInfo: action.bound,
+            getBlockedAdvertisersList: action.bound,
             getAdvertiserPaymentMethods: action.bound,
             getPaymentMethodsList: action.bound,
             getPaymentMethodDisplayName: action.bound,
@@ -100,9 +107,14 @@ export default class MyProfileStore extends BaseStore {
             handleSubmit: action.bound,
             handleToggle: action.bound,
             hideAddPaymentMethodForm: action.bound,
+            loadMoreBlockedAdvertisers: action.bound,
             onClickDelete: action.bound,
-            showAddPaymentMethodForm: action.bound,
+            validatePaymentMethodFields: action.bound,
             updatePaymentMethod: action.bound,
+            showAddPaymentMethodForm: action.bound,
+            onEditDeletePaymentMethodCard: action.bound,
+            onSubmit: action.bound,
+            onClickUnblock: action.bound,
             setActiveTab: action.bound,
             setAddPaymentMethodErrorMessage: action.bound,
             setAdvertiserInfo: action.bound,
@@ -110,6 +122,7 @@ export default class MyProfileStore extends BaseStore {
             setAdvertiserPaymentMethodsError: action.bound,
             setAvailablePaymentMethods: action.bound,
             setBalanceAvailable: action.bound,
+            setBlockedAdvertisersList: action.bound,
             setContactInfo: action.bound,
             setDefaultAdvertDescription: action.bound,
             setDeleteErrorMessage: action.bound,
@@ -128,6 +141,7 @@ export default class MyProfileStore extends BaseStore {
             setPaymentMethodToEdit: action.bound,
             setSearchResults: action.bound,
             setSearchTerm: action.bound,
+            setSelectedBlockedUser: action.bound,
             setSelectedPaymentMethod: action.bound,
             setSelectedPaymentMethodDisplayName: action.bound,
             setSelectedPaymentMethodFields: action.bound,
@@ -227,6 +241,19 @@ export default class MyProfileStore extends BaseStore {
         return list;
     }
 
+    /**
+     * Evaluates a new blocked_advertiser_list based on if the user has searched a blocked advertiser
+     * By default it returns the blocked_advertisers_list when there are no searches
+     *
+     * @returns {Array} Either the entire blocked advertisers list or filtered advertisers list by search term
+     */
+    get rendered_blocked_advertisers_list() {
+        if (this.search_term) {
+            return this.search_results;
+        }
+        return this.blocked_advertisers_list;
+    }
+
     createPaymentMethod(values, { setSubmitting }) {
         setSubmitting(true);
         requestWS({
@@ -280,10 +307,27 @@ export default class MyProfileStore extends BaseStore {
                 this.setContactInfo(p2p_advertiser_info.contact_info);
                 this.setDefaultAdvertDescription(p2p_advertiser_info.default_advert_description);
                 this.root_store.general_store.setShouldShowRealName(!!p2p_advertiser_info.show_name);
-            } else if (response.error.code === 'PermissionDenied') {
+            } else if (response.error.code === api_error_codes.PERMISSION_DENIED) {
                 this.root_store.general_store.setIsBlocked(true);
             } else {
                 this.setErrorMessage(response.error.message);
+            }
+            this.setIsLoading(false);
+        });
+    }
+
+    getBlockedAdvertisersList() {
+        this.setIsLoading(true);
+        requestWS({
+            p2p_advertiser_relations: 1,
+        }).then(response => {
+            if (response) {
+                if (!response.error) {
+                    this.setBlockedAdvertisersList(response.p2p_advertiser_relations?.blocked_advertisers);
+                    this.loadMoreBlockedAdvertisers();
+                } else {
+                    this.root_store.general_store.setBlockUnblockUserError(response.error.message);
+                }
             }
             this.setIsLoading(false);
         });
@@ -424,6 +468,26 @@ export default class MyProfileStore extends BaseStore {
         this.setShouldShowAddPaymentMethodForm(false);
     }
 
+    /**
+     * This function loads more blocked advertisers as necessary if the user is searching for a blocked advertiser
+     * It updates the search_results based on the searched advertiser
+     */
+    loadMoreBlockedAdvertisers() {
+        if (this.search_term) {
+            const search_results = this.blocked_advertisers_list.filter(blocked_advertiser =>
+                blocked_advertiser.name.toLowerCase().includes(this.search_term.toLowerCase().trim())
+            );
+
+            // if user deletes the last blocked advertiser while searching, display 'You have no blocked advertisers' message condition
+            if (this.search_term && search_results.length === 0 && this.blocked_advertisers_list.length === 0) {
+                this.setSearchTerm('');
+            }
+
+            this.setSearchResults(search_results);
+        }
+        this.setIsLoading(false);
+    }
+
     onClickDelete() {
         requestWS({
             p2p_advertiser_payment_methods: 1,
@@ -440,6 +504,34 @@ export default class MyProfileStore extends BaseStore {
                 );
             }
         });
+    }
+
+    onClickUnblock(advertiser) {
+        const { general_store } = this.root_store;
+
+        general_store.setIsBlockUserModalOpen(true);
+        this.setSelectedBlockedUser(advertiser);
+    }
+
+    onEditDeletePaymentMethodCard(event, payment_method) {
+        if (event.target.value === 'edit') {
+            this.setPaymentMethodToEdit(payment_method);
+            this.setSelectedPaymentMethodDisplayName(payment_method?.display_name);
+            this.getSelectedPaymentMethodDetails();
+            this.setShouldShowEditPaymentMethodForm(true);
+        } else {
+            this.setPaymentMethodToDelete(payment_method);
+            this.setIsConfirmDeleteModalOpen(true);
+        }
+    }
+
+    onSubmit() {
+        const { general_store } = this.root_store;
+
+        clearTimeout(delay);
+        general_store.setIsBlockUserModalOpen(false);
+        general_store.blockUnblockUser(false, this.selected_blocked_user.id);
+        const delay = setTimeout(() => this.getBlockedAdvertisersList(), 250);
     }
 
     showAddPaymentMethodForm() {
@@ -569,6 +661,10 @@ export default class MyProfileStore extends BaseStore {
         this.balance_available = balance_available;
     }
 
+    setBlockedAdvertisersList(blocked_advertisers_list) {
+        this.blocked_advertisers_list = blocked_advertisers_list;
+    }
+
     setContactInfo(contact_info) {
         this.contact_info = contact_info;
     }
@@ -639,6 +735,10 @@ export default class MyProfileStore extends BaseStore {
 
     setSearchTerm(search_term) {
         this.search_term = search_term;
+    }
+
+    setSelectedBlockedUser(selected_blocked_user) {
+        this.selected_blocked_user = selected_blocked_user;
     }
 
     setSelectedPaymentMethod(selected_payment_method) {

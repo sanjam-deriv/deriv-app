@@ -1,4 +1,4 @@
-import { getPlatformInformation, isMobile, isTouchDevice, LocalStore, platform_name, routes } from '@deriv/shared';
+import { isMobile, isTouchDevice, LocalStore, routes, isBot } from '@deriv/shared';
 import { MAX_MOBILE_WIDTH, MAX_TABLET_WIDTH } from 'Constants/ui';
 import { action, autorun, computed, observable, makeObservable } from 'mobx';
 import BaseStore from './base-store';
@@ -28,11 +28,13 @@ export default class UIStore extends BaseStore {
     account_switcher_disabled_message = '';
 
     has_only_forward_starting_contracts = false;
+    has_read_scam_message = localStorage.getItem('readScamMessage') || false;
 
     // Purchase Controls
     // @observable is_purchase_confirm_on    = false;
     is_services_error_visible = false;
     is_unsupported_contract_modal_visible = false;
+    is_new_account = localStorage.getItem('isNewAccount') || false;
     is_account_signup_modal_visible = false;
     is_set_residence_modal_visible = false;
     is_reset_password_modal_visible = false;
@@ -102,6 +104,9 @@ export default class UIStore extends BaseStore {
     // MT5 create real STP from demo, show only real accounts from switcher
     should_show_real_accounts_list = false;
 
+    // MT5 acuity download
+    is_acuity_modal_open = false;
+
     // Real account signup
     real_account_signup = {
         active_modal_index: -1,
@@ -142,7 +147,10 @@ export default class UIStore extends BaseStore {
     // add crypto accounts
     should_show_cancel = false;
 
+    app_contents_scroll_ref = null;
     is_deriv_account_needed_modal_visible = false;
+
+    is_switch_to_deriv_account_modal_visible = false;
 
     getDurationFromUnit = unit => this[`duration_${unit}`];
 
@@ -164,6 +172,7 @@ export default class UIStore extends BaseStore {
             'is_dark_mode_on',
             'is_positions_drawer_on',
             'is_reports_visible',
+            'is_warning_scam_message_modal_visible',
             // 'is_purchase_confirm_on',
             // 'is_purchase_lock_on',
             'should_show_cancellation_warning',
@@ -188,8 +197,10 @@ export default class UIStore extends BaseStore {
             is_accounts_switcher_on: observable,
             account_switcher_disabled_message: observable,
             has_only_forward_starting_contracts: observable,
+            has_read_scam_message: observable,
             is_services_error_visible: observable,
             is_unsupported_contract_modal_visible: observable,
+            is_new_account: observable,
             is_account_signup_modal_visible: observable,
             is_set_residence_modal_visible: observable,
             is_reset_password_modal_visible: observable,
@@ -218,6 +229,7 @@ export default class UIStore extends BaseStore {
             real_account_signup_target: observable,
             deposit_real_account_signup_target: observable,
             has_real_account_signup_ended: observable,
+            is_acuity_modal_open: observable,
             is_welcome_modal_visible: observable,
             is_close_mx_mlt_account_modal_visible: observable,
             is_close_uk_account_modal_visible: observable,
@@ -242,8 +254,14 @@ export default class UIStore extends BaseStore {
             should_show_multipliers_onboarding: observable,
             choose_crypto_currency_target: observable,
             should_show_cancel: observable,
+            app_contents_scroll_ref: observable,
             is_deriv_account_needed_modal_visible: observable,
+            is_switch_to_deriv_account_modal_visible: observable,
+            is_warning_scam_message_modal_visible: computed,
+            setScamMessageLocalStorage: action.bound,
+            setIsNewAccount: action.bound,
             init: action.bound,
+            setAppContentsScrollRef: action.bound,
             populateFooterExtensions: action.bound,
             populateHeaderExtensions: action.bound,
             populateSettingsExtensions: action.bound,
@@ -306,6 +324,7 @@ export default class UIStore extends BaseStore {
             setCurrentFocus: action.bound,
             addToast: action.bound,
             removeToast: action.bound,
+            setIsAcuityModalOpen: action.bound,
             setIsNativepickerVisible: action.bound,
             setReportsTabIndex: action.bound,
             toggleWelcomeModal: action.bound,
@@ -316,6 +335,7 @@ export default class UIStore extends BaseStore {
             shouldNavigateAfterChooseCrypto: action.bound,
             continueRouteAfterChooseCrypto: action.bound,
             openDerivRealAccountNeededModal: action.bound,
+            openSwitchToRealAccountModal: action.bound,
         });
 
         window.addEventListener('resize', this.handleResize);
@@ -324,15 +344,6 @@ export default class UIStore extends BaseStore {
         });
     }
     changeTheme = () => {
-        // TODO: [disable-dark-bot] Delete this condition when Bot is ready
-        const new_app_routing_history = this.root_store.common.app_routing_history.slice();
-        const platform = getPlatformInformation(new_app_routing_history).header;
-        if (platform === platform_name.DBot) {
-            document.body.classList.remove('theme--dark');
-            document.body.classList.add('theme--light');
-            return;
-        }
-
         if (this.is_dark_mode_on) {
             document.body.classList.remove('theme--light');
             document.body.classList.add('theme--dark');
@@ -342,8 +353,31 @@ export default class UIStore extends BaseStore {
         }
     };
 
+    get is_warning_scam_message_modal_visible() {
+        return (
+            this.root_store.client.is_logged_in &&
+            this.root_store.client.is_brazil &&
+            !this.has_read_scam_message &&
+            !this.is_new_account
+        );
+    }
+
+    setScamMessageLocalStorage() {
+        localStorage.setItem('readScamMessage', !this.has_read_scam_message);
+        this.has_read_scam_message = localStorage.getItem('readScamMessage') || false;
+    }
+
+    setIsNewAccount() {
+        localStorage.setItem('isNewAccount', !this.is_new_account);
+        this.is_new_account = localStorage.getItem('isNewAccount') || false;
+    }
+
     init(notification_messages) {
         this.notification_messages_ui = notification_messages;
+    }
+
+    setAppContentsScrollRef(value) {
+        this.app_contents_scroll_ref = value;
     }
 
     populateFooterExtensions(footer_extensions) {
@@ -480,6 +514,9 @@ export default class UIStore extends BaseStore {
             this.is_dark_mode_on = is_dark_mode_on;
             // This GTM call is here instead of the GTM store due to frequency of use
             this.root_store.gtm.pushDataLayer({ event: 'switch theme' });
+            if (isBot()) {
+                location.reload();
+            }
         }
 
         return this.is_dark_mode_on;
@@ -730,6 +767,10 @@ export default class UIStore extends BaseStore {
         this.should_show_real_accounts_list = value;
     }
 
+    setIsAcuityModalOpen(value) {
+        this.is_acuity_modal_open = value;
+    }
+
     toggleShouldShowMultipliersOnboarding(value) {
         this.should_show_multipliers_onboarding = value;
     }
@@ -748,5 +789,9 @@ export default class UIStore extends BaseStore {
 
     openDerivRealAccountNeededModal() {
         this.is_deriv_account_needed_modal_visible = !this.is_deriv_account_needed_modal_visible;
+    }
+
+    openSwitchToRealAccountModal() {
+        this.is_switch_to_deriv_account_modal_visible = !this.is_switch_to_deriv_account_modal_visible;
     }
 }
