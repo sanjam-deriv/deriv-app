@@ -3,7 +3,7 @@ import { usePrevious } from '../../hooks';
 
 type TAutoHeightWrapperChildProps = {
     height: number | string;
-    setRef: (ref: HTMLElement) => void;
+    setRef: (ref: HTMLElement | HTMLFormElement | null) => void;
 };
 
 type TAutoHeightWrapperProps = {
@@ -31,8 +31,8 @@ const AutoHeightWrapper = (props: TAutoHeightWrapperProps) => {
                 : props.default_height
         );
 
-    const setRef = (ref: HTMLElement) => {
-        if (Number.isInteger(ref?.clientHeight) && ref.clientHeight !== prev_child_client_height) {
+    const setRef = (ref: HTMLElement | HTMLFormElement | null) => {
+        if (Number.isInteger(ref?.clientHeight) && ref?.clientHeight !== prev_child_client_height) {
             child_client_height_ref.current = ref.clientHeight;
             setTimeout(updateHeight, 0);
         }

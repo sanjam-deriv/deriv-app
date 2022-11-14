@@ -7,7 +7,7 @@ import { Checkbox } from '@deriv/components';
 type TCheckBoxField = {
     field: {
         name: string;
-        value: string;
+        value: boolean;
         onChange: () => any;
     };
     id: string;

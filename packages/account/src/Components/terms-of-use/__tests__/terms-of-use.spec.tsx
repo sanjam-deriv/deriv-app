@@ -1,12 +1,13 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { isDesktop, isMobile, PlatformContext } from '@deriv/shared';
-import TermsOfUse from '../terms-of-use';
+import TermsOfUse, { TTermsOfUse } from '../terms-of-use';
 
 jest.mock('@deriv/shared', () => ({
     ...jest.requireActual('@deriv/shared'),
     isDesktop: jest.fn(() => true),
     isMobile: jest.fn(() => false),
+    checked: Boolean,
 }));
 
 describe('<TermsOfUse/>', () => {
@@ -30,7 +31,7 @@ describe('<TermsOfUse/>', () => {
     const svg_description =
         'Your account will be opened with Deriv (SVG) LLC, and will be subject to the laws of Saint Vincent and the Grenadines.';
 
-    const mock_props = {
+    const mock_props: TTermsOfUse = {
         getCurrentStep: jest.fn(),
         goToNextStep: jest.fn(),
         goToPreviousStep: jest.fn(),
@@ -166,8 +167,8 @@ describe('<TermsOfUse/>', () => {
         expect(mock_props.getCurrentStep).toHaveBeenCalledTimes(1);
         expect(mock_props.onCancel).toHaveBeenCalledTimes(1);
 
-        const agree_checkbox = screen.getByLabelText(agree_check);
-        const not_pep_checkbox = screen.getByLabelText(not_pep_check);
+        const agree_checkbox = screen.getByLabelText(agree_check) as HTMLInputElement;
+        const not_pep_checkbox = screen.getByLabelText(not_pep_check) as HTMLInputElement;
         expect(agree_checkbox.checked).toBeFalsy();
         expect(not_pep_checkbox.checked).toBeFalsy();
 

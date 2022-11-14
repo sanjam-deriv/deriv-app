@@ -29,11 +29,11 @@ type TTermsOfUseExtend = {
     ) => void;
     real_account_signup_target: string;
     value: FormikValues;
-    form_error: string;
+    form_error?: string;
     isDesktop?: string | number | undefined;
 };
 
-type TTermsOfUse = HtmlHTMLAttributes<HTMLInputElement | HTMLLabelElement> & TTermsOfUseExtend;
+export type TTermsOfUse = HtmlHTMLAttributes<HTMLInputElement | HTMLLabelElement> & TTermsOfUseExtend;
 
 const TermsOfUse = ({
     onCancel,
@@ -67,7 +67,7 @@ const TermsOfUse = ({
         >
             {({ handleSubmit, values, isSubmitting }) => (
                 <AutoHeightWrapper default_height={380} height_offset={isDesktop() ? 81 : null}>
-                    {({ setRef }: { setRef: string }) => (
+                    {({ setRef }) => (
                         <form ref={setRef} onSubmit={handleSubmit}>
                             <Div100vhContainer
                                 className='details-form'
