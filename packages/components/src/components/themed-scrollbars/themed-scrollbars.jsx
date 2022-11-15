@@ -19,7 +19,7 @@ const ThemedScrollbars = ({
 }) => {
     const [hoverRef, isHovered] = useHover(refSetter);
 
-    if (is_bypassed) return children;
+    if (is_bypassed) return <>{children}</>;
     return (
         <div
             data-testid='dt_themed_scrollbars'
@@ -39,7 +39,7 @@ const ThemedScrollbars = ({
             }}
             onScroll={onScroll}
         >
-            {children}
+            <>{children}</>
         </div>
     );
 };
