@@ -27,8 +27,8 @@ type TDiv100vhContainerProps = {
 const Div100vhContainer = ({
     children,
     className,
-    is_bypassed,
-    is_disabled,
+    is_bypassed = false,
+    is_disabled = false,
     id,
     height_offset,
     max_autoheight_offset,
@@ -38,6 +38,7 @@ const Div100vhContainer = ({
         height: max_autoheight_offset ? '' : height_rule,
         maxHeight: max_autoheight_offset ? `calc(100rvh - ${max_autoheight_offset})` : '',
     };
+    
     if (is_bypassed) return <React.Fragment>{children}</React.Fragment>;
     return (
         <Div100vh id={id} className={className} style={is_disabled ? {} : height_style}>
