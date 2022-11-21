@@ -8,7 +8,7 @@ type TCheckBoxField = {
     field: {
         name: string;
         value: boolean;
-        onChange: () => any;
+        onChange: () => void;
     };
     id: string;
     label: string;

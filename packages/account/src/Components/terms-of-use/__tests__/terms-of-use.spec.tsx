@@ -167,8 +167,8 @@ describe('<TermsOfUse/>', () => {
         expect(mock_props.getCurrentStep).toHaveBeenCalledTimes(1);
         expect(mock_props.onCancel).toHaveBeenCalledTimes(1);
 
-        const agree_checkbox = screen.getByLabelText(agree_check) as HTMLInputElement;
-        const not_pep_checkbox = screen.getByLabelText(not_pep_check) as HTMLInputElement;
+        const agree_checkbox: HTMLInputElement = screen.getByLabelText(agree_check);
+        const not_pep_checkbox: HTMLInputElement = screen.getByLabelText(not_pep_check);
         expect(agree_checkbox.checked).toBeFalsy();
         expect(not_pep_checkbox.checked).toBeFalsy();
 
