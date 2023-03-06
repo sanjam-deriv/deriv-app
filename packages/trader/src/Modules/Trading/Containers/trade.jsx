@@ -51,6 +51,7 @@ const Trade = ({
     should_show_multipliers_onboarding,
     symbol,
     is_synthetics_available,
+    is_synthetics_trading_market_available,
 }) => {
     const [digits, setDigits] = React.useState([]);
     const [tick, setTick] = React.useState({});
@@ -127,14 +128,17 @@ const Trade = ({
         }
     };
 
-    const topWidgets = ({ ...params }) => (
-        <ChartTopWidgets
-            open_market={open_market}
-            open={try_synthetic_indices || try_open_markets}
-            charts_ref={charts_ref}
-            is_digits_widget_active={is_digits_widget_active}
-            {...params}
-        />
+    const topWidgets = React.useCallback(
+        ({ ...params }) => (
+            <ChartTopWidgets
+                open_market={open_market}
+                open={try_synthetic_indices || try_open_markets}
+                charts_ref={charts_ref}
+                is_digits_widget_active={is_digits_widget_active}
+                {...params}
+            />
+        ),
+        [open_market, try_synthetic_indices, try_open_markets, charts_ref, is_digits_widget_active]
     );
 
     const form_wrapper_class = isMobile() ? 'mobile-wrapper' : 'sidebar__container desktop-only';
@@ -198,8 +202,8 @@ const Trade = ({
                 {is_market_closed && !is_market_unavailable_visible && (
                     <MarketIsClosedOverlay
                         is_eu={is_eu}
-                        is_synthetics_available={is_synthetics_available}
-                        {...(is_eu && category && { is_market_available: true })}
+                        is_synthetics_trading_market_available={is_synthetics_trading_market_available}
+                        {...(is_eu && category)}
                         onClick={onTryOtherMarkets}
                         onMarketOpen={prepareTradeStore}
                         symbol={symbol}
@@ -220,6 +224,7 @@ export default connect(({ client, common, modules, ui }) => ({
     getFirstOpenMarket: modules.trade.getFirstOpenMarket,
     is_eu: client.is_eu,
     is_synthetics_available: modules.trade.is_synthetics_available,
+    is_synthetics_trading_market_available: modules.trade.is_synthetics_trading_market_available,
     network_status: common.network_status,
     contract_type: modules.trade.contract_type,
     form_components: modules.trade.form_components,
@@ -287,6 +292,7 @@ const Chart = props => {
         end_epoch,
         granularity,
         has_alternative_source,
+        is_eu_country,
         is_trade_enabled,
         is_socket_opened,
         main_barrier,
@@ -341,6 +347,7 @@ const Chart = props => {
             chartControlsWidgets={null}
             chartStatusListener={v => setChartStatus(!v)}
             chartType={chart_type}
+            is_eu_country={is_eu_country}
             initialData={{
                 activeSymbols: JSON.parse(JSON.stringify(active_symbols)),
             }}
@@ -394,6 +401,7 @@ Chart.propTypes = {
     exportLayout: PropTypes.func,
     end_epoch: PropTypes.number,
     granularity: PropTypes.number,
+    is_eu_country: PropTypes.bool,
     is_trade_enabled: PropTypes.bool,
     is_socket_opened: PropTypes.bool,
     has_alternative_source: PropTypes.bool,
@@ -408,7 +416,7 @@ Chart.propTypes = {
     wsSubscribe: PropTypes.func,
 };
 
-const ChartTrade = connect(({ modules, ui, common, contract_trade }) => ({
+const ChartTrade = connect(({ modules, ui, common, contract_trade, client }) => ({
     is_socket_opened: common.is_socket_opened,
     granularity: contract_trade.granularity,
     chart_type: contract_trade.chart_type,
@@ -423,6 +431,7 @@ const ChartTrade = connect(({ modules, ui, common, contract_trade }) => ({
         position: ui.is_chart_layout_default ? 'bottom' : 'left',
         theme: ui.is_dark_mode_on ? 'dark' : 'light',
     },
+    is_eu_country: client.is_eu_country,
     last_contract: {
         is_digit_contract: contract_trade.last_contract.is_digit_contract,
         is_ended: contract_trade.last_contract.is_ended,

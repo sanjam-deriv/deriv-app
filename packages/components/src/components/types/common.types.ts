@@ -4,5 +4,9 @@ export type TGenericObjectType = {
     [key: string]: React.ReactNode;
 };
 
+export type TItem = {
+    id: string;
+    value: Array<TItem> | string;
+};
 
-export type TTableRowItem = { component: React.ReactNode } | string
+export type TTableRowItem = { component: React.ReactNode } | string;

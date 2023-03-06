@@ -14,12 +14,14 @@ import PaymentMethodCard from '../my-profile/payment-methods/payment-method-card
 import { floatingPointValidator } from 'Utils/validations';
 import { countDecimalPlaces } from 'Utils/string';
 import { generateEffectiveRate, setDecimalPlaces, roundOffDecimal, removeTrailingZeros } from 'Utils/format-value';
+import { useModalManagerContext } from 'Components/modal-manager/modal-manager-context';
 
 const BuySellForm = props => {
     const isMounted = useIsMounted();
     const { advertiser_page_store, buy_sell_store, floating_rate_store, general_store, my_profile_store } = useStores();
     const [selected_methods, setSelectedMethods] = React.useState([]);
     buy_sell_store.setFormProps(props);
+    const { showModal } = useModalManagerContext();
 
     const { setPageFooterParent } = props;
     const {
@@ -80,12 +82,25 @@ const BuySellForm = props => {
             }
 
             advertiser_page_store.setFormErrorMessage('');
-            buy_sell_store.setShowRateChangePopup(rate_type === ad_type.FLOAT);
+            const disposeRateChangeModal = reaction(
+                () => floating_rate_store.is_market_rate_changed,
+                is_market_rate_changed => {
+                    if (is_market_rate_changed && rate_type === ad_type.FLOAT) {
+                        showModal({
+                            key: 'RateChangeModal',
+                            props: {
+                                currency: buy_sell_store.local_currency,
+                            },
+                        });
+                    }
+                }
+            );
             buy_sell_store.setInitialReceiveAmount(calculated_rate);
 
             return () => {
                 buy_sell_store.payment_method_ids = [];
                 disposeReceiveAmountReaction();
+                disposeRateChangeModal();
             };
         },
         [] // eslint-disable-line react-hooks/exhaustive-deps
@@ -142,8 +157,8 @@ const BuySellForm = props => {
                 validateOnMount={!should_disable_field}
                 initialValues={{
                     amount: min_order_amount_limit,
-                    contact_info: buy_sell_store.contact_info,
-                    payment_info: buy_sell_store.payment_info,
+                    contact_info: general_store.contact_info,
+                    payment_info: general_store.payment_info,
                     rate: rate_type === ad_type.FLOAT ? effective_rate : null,
                 }}
                 initialErrors={buy_sell_store.is_sell_advert ? { contact_info: true } : {}}
@@ -436,7 +451,7 @@ const BuySellForm = props => {
                                                             label={localize('Your bank details')}
                                                             required
                                                             has_character_counter
-                                                            initial_character_count={buy_sell_store.payment_info.length}
+                                                            initial_character_count={general_store.payment_info.length}
                                                             max_characters={300}
                                                             disabled={should_disable_field}
                                                         />
@@ -455,7 +470,7 @@ const BuySellForm = props => {
                                                         label={localize('Your contact details')}
                                                         required
                                                         has_character_counter
-                                                        initial_character_count={buy_sell_store.contact_info.length}
+                                                        initial_character_count={general_store.contact_info.length}
                                                         max_characters={300}
                                                         disabled={should_disable_field}
                                                     />
@@ -477,7 +492,6 @@ BuySellForm.propTypes = {
     advert: PropTypes.object,
     contact_info: PropTypes.string,
     form_props: PropTypes.object,
-    getAdvertiserInfo: PropTypes.func,
     setIsSubmitDisabled: PropTypes.func,
     setSubmitForm: PropTypes.func,
     setPageFooterParent: PropTypes.func,

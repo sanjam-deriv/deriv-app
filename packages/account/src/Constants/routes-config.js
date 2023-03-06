@@ -5,9 +5,11 @@ import {
     AccountLimits,
     Passwords,
     PersonalDetails,
+    TradingAssessment,
     FinancialAssessment,
     ProofOfIdentity,
     ProofOfAddress,
+    ProofOfOwnership,
     ApiToken,
     TwoFactorAuthentication,
     SelfExclusion,
@@ -17,6 +19,7 @@ import {
     LoginHistory,
     AccountClosed,
     DeactivateAccount,
+    LanguageSettings,
 } from 'Sections';
 
 // Error Routes
@@ -54,6 +57,22 @@ const initRoutesConfig = ({ is_appstore }) => [
                         default: true,
                     },
                     {
+                        path: routes.languages,
+                        component: LanguageSettings,
+                        getTitle: () => localize('Languages'),
+                    },
+                ],
+            },
+            {
+                getTitle: () => localize('Assessments'),
+                icon: 'IcAssessment',
+                subroutes: [
+                    {
+                        path: routes.trading_assessment,
+                        component: TradingAssessment,
+                        getTitle: () => localize('Trading assessment'),
+                    },
+                    {
                         path: routes.financial_assessment,
                         component: FinancialAssessment,
                         getTitle: () => localize('Financial assessment'),
@@ -73,6 +92,11 @@ const initRoutesConfig = ({ is_appstore }) => [
                         path: routes.proof_of_address,
                         component: ProofOfAddress,
                         getTitle: () => localize('Proof of address'),
+                    },
+                    {
+                        path: routes.proof_of_ownership,
+                        component: ProofOfOwnership,
+                        getTitle: () => localize('Proof of ownership'),
                     },
                 ],
             },

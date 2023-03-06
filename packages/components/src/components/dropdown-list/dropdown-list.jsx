@@ -3,7 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { CSSTransition } from 'react-transition-group';
 import PropTypes from 'prop-types';
-import ThemedScrollbars from '../themed-scrollbars/themed-scrollbars.jsx';
+import ThemedScrollbars from '../themed-scrollbars/themed-scrollbars';
 
 const ListItem = ({
     is_active,
@@ -19,7 +19,8 @@ const ListItem = ({
         <div
             ref={child_ref}
             // onMouseDown ensures the click handler runs before the onBlur event of Input
-            onMouseDown={() => {
+            onMouseDown={event => {
+                event.stopPropagation();
                 onItemSelection(item);
                 setActiveIndex(index);
             }}

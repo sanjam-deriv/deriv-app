@@ -23,8 +23,12 @@ type TTableRow<T> = {
 };
 
 type TCellContent<U> = {
-    cell_value: string , col_index: string, row_obj?: U, is_footer: boolean, passthrough: any
-}
+    cell_value: string;
+    col_index: string;
+    row_obj?: U;
+    is_footer: boolean;
+    passthrough: any;
+};
 
 const TableRow = ({
     className,
@@ -52,7 +56,7 @@ const TableRow = ({
             key,
         }: {
             col_index: string;
-            renderCellContent: (params:TCellContent<any>) => any;
+            renderCellContent: (params: TCellContent<any>) => any;
             title: string;
             key: string;
         }) => {
