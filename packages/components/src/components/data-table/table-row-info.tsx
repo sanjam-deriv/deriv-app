@@ -4,7 +4,7 @@ import ThemedScrollbars from '../themed-scrollbars';
 import { TTableRowItem } from '../types/common.types';
 
 type TTableRowIndex = {
-    replace: TTableRowItem|undefined;
+    replace: TTableRowItem | undefined;
     is_footer: boolean;
     cells: React.ReactElement;
     className?: string;
@@ -52,6 +52,5 @@ const TableRowInfo = ({ replace, is_footer, cells, className, is_dynamic_height,
         </div>
     );
 };
-
 
 export default TableRowInfo;

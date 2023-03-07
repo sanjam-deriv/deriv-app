@@ -9,4 +9,4 @@ export type TItem = {
     value: Array<TItem> | string;
 };
 
-export type TTableRowItem = { component: React.ReactNode } | string;
+export type TTableRowItem = { component: React.ReactNode };

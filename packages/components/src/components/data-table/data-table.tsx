@@ -1,46 +1,56 @@
+/* eslint @typescript-eslint/triple-slash-reference: "off" */
+/// <reference path="../cellmeasurer/CellMeasurerCache.d.ts" />
+/// <reference path="../cellmeasurer/CellMeasurer.d.ts" />
+/// <reference path="../list/List.d.ts" />
+
 import classNames from 'classnames';
-import { List as _List, ListProps } from 'react-virtualized/dist/es/List';
 import React, { CSSProperties, FC, UIEventHandler } from 'react';
-import { AutoSizer as _AutoSizer, AutoSizerProps } from 'react-virtualized/dist/es/AutoSizer';
-import {
-    CellMeasurer as _CellMeasurer,
-    CellMeasurerCache,
-    CellMeasurerCacheInterface,
-    CellMeasurerProps,
-    MeasuredCellParent,
-} from 'react-virtualized/dist/es/CellMeasurer';
 import TableRow from './table-row';
 import ThemedScrollbars from '../themed-scrollbars';
-import type { Grid, Index } from 'react-virtualized';
+import type { Grid } from 'react-virtualized';
 import TableRowInfo from './table-row-info';
 import TableCell from './table-cell';
 import { TTableRowItem } from '../types/common.types';
+import { AutoSizer } from '@enykeev/react-virtualized/dist/es/AutoSizer';
+import { CellMeasurer } from '@enykeev/react-virtualized/dist/es/CellMeasurer';
+import { CellMeasurerCache } from '@enykeev/react-virtualized/dist/es/CellMeasurer/CellMeasurerCache';
+import List from '@enykeev/react-virtualized/dist/es/List';
 
 /* TODO:
       1. implement sorting by column (ASC/DESC)
       2. implement filtering per column
 */
+export type TSource = {
+    [key: string]: string;
+};
 
+type TMeasure = {
+    measure: () => void;
+};
+type TRowRenderer = {
+    style: CSSProperties;
+    index: number;
+    key: string;
+    parent: React.RefObject<Grid>;
+};
 
-type TDataTable= {
+type TDataTable = {
     className: string;
     content_loader: React.ElementType;
     columns: any;
     contract_id: number;
-    getActionColumns: (params: { row_obj?: any; is_header?: boolean; is_footer: boolean }) => any;
-    getRowSize: () => number;
+    getActionColumns: (params: { row_obj?: TSource; is_header?: boolean; is_footer: boolean }) => TTableRowItem[];
+    getRowSize?: ((params: { index: number }) => number) | number;
     measure: () => void;
     getRowAction?: (item: any) => TTableRowItem;
     onScroll: UIEventHandler<HTMLDivElement>;
     id: number;
-    passthrough: any;
+    passthrough: (item: TSource) => boolean;
     autoHide?: boolean;
     footer: boolean;
     preloaderCheck: (param: any) => boolean;
-    rowHeight: (params: Index) => number;
-    data_source: any;
-    keyMapper: (row_index?: any) => number;
-    cache: CellMeasurerCacheInterface;
+    data_source: TSource[];
+    keyMapper: (row: TSource) => number | string;
 };
 
 const DataTable = ({
@@ -59,10 +69,7 @@ const DataTable = ({
     passthrough,
     preloaderCheck,
 }: React.PropsWithChildren<TDataTable>) => {
-    const List = _List as any as FC<ListProps>;
-    const AutoSizer = _AutoSizer as any as FC<AutoSizerProps>;
-    const CellMeasurer = _CellMeasurer as any as FC<CellMeasurerProps>;
-    const cache_ref = React.useRef<CellMeasurerCache>();
+    const cache_ref = React.useRef<typeof CellMeasurerCache>();
     const list_ref = React.useRef<Grid>();
     const is_dynamic_height = !getRowSize;
     const [scroll_top, setScrollTop] = React.useState(0);
@@ -72,7 +79,7 @@ const DataTable = ({
         if (is_dynamic_height) {
             cache_ref.current = new CellMeasurerCache({
                 fixedWidth: true,
-                keyMapper: row_index => {
+                keyMapper: (row_index: number) => {
                     if (row_index < data_source.length) return keyMapper?.(data_source[row_index]) || row_index;
                     return row_index;
                 },
@@ -83,7 +90,7 @@ const DataTable = ({
     }, []);
 
     React.useEffect(() => {
-        if (is_dynamic_height) list_ref?.current?.recomputeGridSize();
+        if (is_dynamic_height) list_ref?.current?.recomputeGridSize({ columnIndex: 0, rowIndex: 0 });
     }, [data_source, is_dynamic_height]);
 
     const handleScroll = (ev: React.UIEvent<HTMLDivElement, UIEvent>) => {
@@ -91,17 +98,7 @@ const DataTable = ({
         if (typeof onScroll === 'function') onScroll(ev);
     };
 
-    const rowRenderer = ({
-        style,
-        index,
-        key,
-        parent,
-    }: {
-        style: CSSProperties | undefined;
-        index: number;
-        key: string;
-        parent: MeasuredCellParent;
-    }) => {
+    const rowRenderer = ({ style, index, key, parent }: TRowRenderer) => {
         const item = data_source[index];
         const action = getRowAction && getRowAction(item);
         const contract_id = item.contract_id || item.id;
@@ -129,7 +126,7 @@ const DataTable = ({
 
         return is_dynamic_height ? (
             <CellMeasurer cache={cache_ref.current!} columnIndex={0} key={row_key} rowIndex={index} parent={parent}>
-                {({ measure }) => <div style={style}>{getContent(measure)}</div>}
+                {({ measure }: TMeasure) => <div style={style}>{getContent(measure)}</div>}
             </CellMeasurer>
         ) : (
             <div key={row_key} style={style}>
@@ -178,9 +175,13 @@ const DataTable = ({
                                         deferredMeasurementCache={cache_ref.current}
                                         height={height}
                                         overscanRowCount={1}
-                                        ref={(ref: any) => (list_ref.current = ref)}
+                                        ref={(ref: Grid) => (list_ref.current = ref)}
                                         rowCount={data_source.length}
-                                        rowHeight={is_dynamic_height ? cache_ref?.current?.rowHeight : getRowSize}
+                                        rowHeight={
+                                            is_dynamic_height && cache_ref?.current?.rowHeight
+                                                ? cache_ref?.current?.rowHeight
+                                                : getRowSize || 0
+                                        }
                                         rowRenderer={rowRenderer}
                                         scrollingResetTimeInterval={0}
                                         scrollTop={scroll_top}
@@ -216,6 +217,3 @@ DataTable.TableRowInfo = TableRowInfo;
 DataTable.TableCell = TableCell;
 
 export default DataTable;
-function rowIndex(row_index: any) {
-    throw new Error('Function not implemented.');
-}
