@@ -1,5 +1,4 @@
 /* eslint @typescript-eslint/triple-slash-reference: "off" */
-/// <reference path="../cellmeasurer/CellMeasurerCache.d.ts" />
 /// <reference path="../cellmeasurer/CellMeasurer.d.ts" />
 /// <reference path="../list/List.d.ts" />
 
@@ -13,7 +12,7 @@ import TableCell from './table-cell';
 import { TTableRowItem } from '../types/common.types';
 import { AutoSizer } from '@enykeev/react-virtualized/dist/es/AutoSizer';
 import { CellMeasurer } from '@enykeev/react-virtualized/dist/es/CellMeasurer';
-import { CellMeasurerCache } from '@enykeev/react-virtualized/dist/es/CellMeasurer/CellMeasurerCache';
+import CellMeasurerCache from '@enykeev/react-virtualized/dist/es/CellMeasurer/CellMeasurerCache';
 import List from '@enykeev/react-virtualized/dist/es/List';
 
 /* TODO:
@@ -37,12 +36,11 @@ type TRowRenderer = {
 type TDataTable = {
     className: string;
     content_loader: React.ElementType;
-    columns: any;
+    columns: string[];
     contract_id: number;
     getActionColumns: (params: { row_obj?: TSource; is_header?: boolean; is_footer: boolean }) => TTableRowItem[];
     getRowSize?: ((params: { index: number }) => number) | number;
-    measure: () => void;
-    getRowAction?: (item: any) => TTableRowItem;
+    getRowAction?: (item: TSource) => TTableRowItem;
     onScroll: UIEventHandler<HTMLDivElement>;
     id: number;
     passthrough: (item: TSource) => boolean;
@@ -125,7 +123,7 @@ const DataTable = ({
         );
 
         return is_dynamic_height ? (
-            <CellMeasurer cache={cache_ref.current!} columnIndex={0} key={row_key} rowIndex={index} parent={parent}>
+            <CellMeasurer cache={cache_ref.current!} columnIndex={0} key={row_key} rowIndex={index}>
                 {({ measure }: TMeasure) => <div style={style}>{getContent(measure)}</div>}
             </CellMeasurer>
         ) : (
