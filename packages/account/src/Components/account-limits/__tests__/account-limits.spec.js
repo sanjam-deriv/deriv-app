@@ -28,7 +28,7 @@ jest.mock('@deriv/shared', () => ({
 
 jest.mock('Components/demo-message', () => jest.fn(() => 'mockedDemoMessage'));
 jest.mock('Components/load-error-message', () => jest.fn(() => 'mockedLoadErrorMessage'));
-jest.mock('../account-limits-footer.jsx', () => jest.fn(() => 'mockedAccountLimitsFooter'));
+jest.mock('../account-limits-footer', () => jest.fn(() => 'mockedAccountLimitsFooter'));
 
 describe('<AccountLimits/>', () => {
     const props = {
@@ -179,13 +179,13 @@ describe('<AccountLimits/>', () => {
         expect(screen.queryByText('/account limits/i')).not.toBeInTheDocument();
     });
 
-    it('should render Trading limits - Item table and its contents properly', () => {
+    it('should render Trading limits table and its trading limits contents properly', () => {
         render(<AccountLimits {...props} />);
         expect(screen.queryByTestId('account_limits_data')).toBeInTheDocument();
 
         expect(
             screen.getByRole('columnheader', {
-                name: /trading limits \- item/i,
+                name: /trading limits/i,
             })
         ).toBeInTheDocument();
         expect(
@@ -221,12 +221,12 @@ describe('<AccountLimits/>', () => {
         expect(formatMoney).toHaveBeenCalledWith(props.currency, account_balance, true);
     });
 
-    it('should render Trading limits - Item table and its contents properly', () => {
+    it('should render Trading limits table and its maximum daily turnover contents properly', () => {
         render(<AccountLimits {...props} />);
         expect(screen.queryByTestId('trading_daily_turnover_table')).toBeInTheDocument();
         expect(
             screen.getByRole('columnheader', {
-                name: /trading limits \- maximum daily turnover/i,
+                name: /maximum daily turnover/i,
             })
         ).toBeInTheDocument();
         expect(

@@ -50,6 +50,8 @@ export const hasContractEntered = (contract_info: TContractInfo) => !!contract_i
 
 export const isMultiplierContract = (contract_type: string) => /MULT/i.test(contract_type);
 
+export const isVanillaContract = (contract_type: string) => /VANILLA/i.test(contract_type);
+
 export const isCryptoContract = (underlying: string) => /^cry/.test(underlying);
 
 type TGetCurrentTick = TContractInfo & {
@@ -109,7 +111,7 @@ export const getLimitOrderAmount = (limit_order: TLimitOrder) => {
     };
 };
 
-export const getTimePercentage = (server_time: number, start_time: number, expiry_time: number) => {
+export const getTimePercentage = (server_time: moment.Moment, start_time: number, expiry_time: number) => {
     const duration_from_purchase = moment.duration(moment.unix(expiry_time).diff(moment.unix(start_time)));
     const duration_from_now = moment.duration(moment.unix(expiry_time).diff(server_time));
     let percentage = (duration_from_now.asMilliseconds() / duration_from_purchase.asMilliseconds()) * 100;

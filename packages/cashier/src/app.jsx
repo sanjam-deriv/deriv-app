@@ -2,10 +2,11 @@ import React from 'react';
 import { setWebsocket } from '@deriv/shared';
 import { init } from 'Utils/server_time';
 import Routes from 'Containers/routes';
-import { MobxContentProvider } from 'Stores/connect';
-import { StoreProvider } from './hooks';
+import CashierProviders from './cashier-providers';
 
 const App = ({ passthrough: { WS, root_store } }) => {
+    const { notification_messages_ui: Notifications } = root_store.ui;
+
     React.useEffect(() => {
         setWebsocket(WS);
         init();
@@ -13,11 +14,10 @@ const App = ({ passthrough: { WS, root_store } }) => {
     }, []);
 
     return (
-        <MobxContentProvider store={root_store}>
-            <StoreProvider store={root_store}>
-                <Routes />
-            </StoreProvider>
-        </MobxContentProvider>
+        <CashierProviders store={root_store}>
+            {Notifications && <Notifications />}
+            <Routes />
+        </CashierProviders>
     );
 };
 

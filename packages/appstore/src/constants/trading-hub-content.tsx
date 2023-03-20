@@ -1,10 +1,12 @@
 import React from 'react';
 import { localize } from '@deriv/translations';
-import StaticDashboard from 'Components/onboarding/static-dashboard';
+import StaticDashboard from 'Components/onboarding-new/static-dashboard';
 
 type TStep = {
     component: React.ReactNode;
+    eu_footer_header?: string;
     footer_header: string;
+    eu_footer_text?: string;
     footer_text: string;
     next_content?: string;
     has_next_content: boolean;
@@ -12,7 +14,7 @@ type TStep = {
 
 type TTradingHubContents = Record<'step1' | 'step2' | 'step3' | 'step4' | 'step5' | 'step6', TStep>;
 
-export const trading_hub_contents: TTradingHubContents = {
+export const getTradingHubContents = (): TTradingHubContents => ({
     step1: {
         component: (
             <StaticDashboard
@@ -40,8 +42,8 @@ export const trading_hub_contents: TTradingHubContents = {
                 }}
             />
         ),
-        footer_header: localize('Welcome to Trading Hub'),
-        footer_text: localize('This is your new dashboard'),
+        footer_header: localize("Welcome to Trader's hub"),
+        footer_text: localize('This is your personal start page for Deriv'),
         has_next_content: false,
     },
     step2: {
@@ -73,7 +75,7 @@ export const trading_hub_contents: TTradingHubContents = {
         ),
         footer_header: localize('Trading accounts'),
         footer_text: localize(
-            'These are the trading accounts available to you. You can click on an account to find out more.'
+            'These are the trading accounts available to you. You can click on an account’s icon or description to find out more'
         ),
         has_next_content: false,
     },
@@ -105,7 +107,9 @@ export const trading_hub_contents: TTradingHubContents = {
             />
         ),
         footer_header: localize('CFDs, Options or Multipliers'),
+        eu_footer_header: localize('CFDs or Multipliers'),
         footer_text: localize('You can choose between CFD trading accounts or Options and Multipliers accounts'),
+        eu_footer_text: localize('You can choose between CFD trading accounts and Multipliers accounts'),
         has_next_content: false,
     },
     step4: {
@@ -155,7 +159,7 @@ export const trading_hub_contents: TTradingHubContents = {
                     options_text: true,
                     cfd_description: false,
                     options_description: false,
-                    platformlauncher: false,
+                    platformlauncher: true,
                 }}
                 is_onboarding_animated={{
                     text: false,
@@ -167,16 +171,17 @@ export const trading_hub_contents: TTradingHubContents = {
                 is_grey
                 has_account
                 currency={'USD'}
-                derived_amount={'369'}
+                mf_currency={'EUR'}
+                derived_amount={'0'}
+                financial_amount={'0'}
                 loginid={'20884385'}
                 has_applauncher_account
-                is_last_step
                 is_derivx_last_step
                 is_financial_last_step
             />
         ),
         footer_header: localize('Top-up your account'),
-        footer_text: localize('Once you have an account click ‘Top-up’ to add funds '),
+        footer_text: localize('Once you have an account click on ‘Deposit’ or ‘Transfer’ to add funds to an account'),
         has_next_content: false,
     },
     step6: {
@@ -207,10 +212,11 @@ export const trading_hub_contents: TTradingHubContents = {
                 is_grey
                 has_account
                 currency={'USD'}
-                financial_amount={'512'}
+                mf_currency={'EUR'}
+                derived_amount={'0'}
+                financial_amount={'0'}
                 loginid={'20884385'}
                 has_applauncher_account
-                is_last_step
                 is_derivx_last_step
                 is_financial_last_step
             />
@@ -220,4 +226,4 @@ export const trading_hub_contents: TTradingHubContents = {
         has_next_content: true,
         next_content: localize('Start trading'),
     },
-};
+});
